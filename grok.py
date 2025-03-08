@@ -1,4 +1,5 @@
 from seleniumbase import Driver
+from selenium.webdriver.common.by import By
 import os
 import csv
 from dotenv import load_dotenv
@@ -31,12 +32,26 @@ def login(driver):
     driver.click('button[type="submit"]')
     driver.sleep(3)
 
-def process_ticket(driver, ticket):
+def process_ticket(driver, ticket, index):
     """Process a single ticket."""
     driver.type('textarea[dir="auto"]', f"{ticket} {PROMPT}\n")
-    driver.sleep(20)
+    driver.sleep(5)
+    while True:
+        lis = driver.find_elements(By.TAG_NAME, 'li')
+        if len(lis) == (index + 1) * 15:
+            break
+        driver.sleep(1)
     elements = driver.find_elements('div[dir="auto"]')
-    return elements[1].text
+    print(f"{len(elements)} elements found")
+    h3s = elements[2 * index + 1].find_elements(By.TAG_NAME, 'h3')
+    lines = elements[2 * index + 1].find_elements(By.TAG_NAME, 'li')
+    print(f"{len(h3s)} h3s and {len(lines)} lines found")
+    result = f"{ticket}\n\n"
+    for i in range(3):
+        result += h3s[i].text + '\n'
+        for j in range(5):
+            result += lines[j + 5 * i].text + '\n'
+    return result
 
 def save_result(result, file_path):
     """Save the result to a text file."""
@@ -44,17 +59,20 @@ def save_result(result, file_path):
         file.write(result + '\n')
 
 def main():
-    """Main function to execute the script."""
+    """Reset result file before starting."""
     if os.path.exists(RESULT_FILE):
         os.remove(RESULT_FILE)
+
+    """Main function to execute the script."""
     ticket_list = load_tickets(TICKET_FILE)
     driver = Driver(uc=True)
     driver.maximize_window()
 
     try:
         login(driver)
-        for ticket in ticket_list:
-            result_text = process_ticket(driver, ticket)
+        for index, ticket in enumerate(ticket_list):
+            print(f"Processing ticket {index + 1}/{len(ticket_list)}: {ticket}")
+            result_text = process_ticket(driver, ticket, index)
             save_result(result_text, RESULT_FILE)
         print("Script completed successfully.")
     except Exception as e:
